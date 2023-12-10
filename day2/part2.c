@@ -5,16 +5,18 @@
 #include <stdbool.h>
 #include "regex_helper.h"
 
-#define MAX_RED 12
-#define MAX_GREEN 13
-#define MAX_BLUE 14
-
-int is_possible(int number, char *color) {
-    if(strcmp(color, "red") == 0) return number <= MAX_RED; 
-    if(strcmp(color, "green") == 0) return number <= MAX_GREEN; 
-    if(strcmp(color, "blue") == 0) return number <= MAX_BLUE; 
-    
-    return false;
+void check_max(int number, char *color, int *red_max, int *blue_max, int *green_max) {
+    if(strcmp(color, "red") == 0){
+        if(number > *red_max) *red_max = number;
+        return;
+    }
+    if(strcmp(color, "blue") == 0){
+        if(number > *blue_max) *blue_max = number;
+        return;
+    }
+    if(strcmp(color, "green") == 0){
+        if(number > *green_max) *green_max = number;
+    }
 }
 
 
@@ -25,18 +27,10 @@ int main(int argc, char* argv[]) {
 	}
 
     //Compile regex
-    regex_t game_index_pattern;
     regex_t cube_pattern;
     regmatch_t match[4]; 
     int regex_flag;
 
-    regex_flag = regcomp(&game_index_pattern, 
-            "Game ([[:digit:]]+): ",
-            REG_EXTENDED);
-    if(regex_flag) {
-        printf("Regex compolation error for game index pattern");
-        return 1;
-    }
     regex_flag = regcomp(&cube_pattern, 
             "([[:digit:]]+) (blue|red|green)",
             REG_EXTENDED);
@@ -57,47 +51,38 @@ int main(int argc, char* argv[]) {
 
     //Loop variables
     int total; //sum of all valid game indexes
-    char* game_idx = (char*) malloc(5*sizeof(char));
     char* num_blocks = (char*) malloc(5*sizeof(char));
     char* color = (char*) malloc(6*sizeof(char)); //green is longest color
-    int valid_game_flag = 1;
     regoff_t offset = 0;
-
-    char* temp_str = (char*) malloc(100*sizeof(char));
-
+    int* red_max = calloc(1, sizeof(int));
+    int* green_max = calloc(1, sizeof(int));
+    int* blue_max = calloc(1, sizeof(int));
     while ((read = getline(&line, &len, fptr)) != -1) {
         if(read < 2) {
             continue; //empty line
         }    
-        //Parse game number
-        regex_flag = regexec(&game_index_pattern, line, 4, match, 0);
-        if(regex_flag) {
-            printf("No matches found\n");
-            continue;
-        }
-        get_substr(line, match[1], game_idx);
+        printf("--------");
+        printf("%s", line);
         //Reset inner loop vars
         offset = 0;  
-        valid_game_flag = 1;
-        while(valid_game_flag) {
-            regex_flag = regexec(&cube_pattern, line+offset, 4, match, 0);
-            if(regex_flag) {
-                //If we got here with a valid game flag, game is valid
-                total += atoi(game_idx);
-                break;
-            }
+        *red_max = 0;
+        *green_max = 0;
+        *blue_max = 0;
+        while(regexec(&cube_pattern, line+offset, 4, match, 0) == 0) {
             get_substr(line+offset, match[1], num_blocks);
             get_substr(line+offset, match[2], color);
-            valid_game_flag *= is_possible(atoi(num_blocks), color); 
+            check_max(atoi(num_blocks), color, red_max, blue_max, green_max); 
             offset += match[0].rm_eo + 1;
         }
+        total += (*red_max) * (*blue_max) * (*green_max);
     }    
     printf("Final total: %d\n", total);
     free(num_blocks);
     free(color);
-    free(game_idx);
+    free(red_max);
+    free(green_max);
+    free(blue_max);
 	fclose(fptr);
-    regfree(&game_index_pattern);
     regfree(&cube_pattern);
     
 	return 0;
